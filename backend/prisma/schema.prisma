@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CITIZEN
+  OFFICER
+  ADMIN
+}
+
+enum InfrastructureType {
+  STREETLIGHT
+  FOOTPATH
+  WHEELCHAIR_RAMP
+  PUBLIC_TOILET
+  DRINKING_WATER
+  BUS_STOP
+  TRAFFIC_SIGNAL
+  OTHER
+}
+
+enum InfrastructureStatus {
+  WORKING
+  WARNING
+  BROKEN
+  MISSING
+  INACCESSIBLE
+  UNKNOWN
+}
+
+enum SeverityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  COMMUNITY_VERIFIED
+  OFFICIALLY_VERIFIED
+}
+
+enum IssueType {
+  BROKEN
+  MISSING
+  BLOCKED
+  INACCESSIBLE
+  UNSAFE
+  NOT_WORKING
+  OTHER
+}
+
+enum ReportStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  VERIFIED
+  RESOLVED
+  REJECTED
+}
+
+enum VerificationType {
+  COMMUNITY
+  OFFICIAL
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  role      UserRole @default(CITIZEN)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Area {
+  id              String           @id @default(uuid())
+  name            String           @unique
+  description     String?
+  latitude        Float
+  longitude       Float
+  radius          Float            @default(2000) // in meters
+  infrastructures Infrastructure[]
+  reports         Report[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([latitude, longitude])
+  @@index([name])
+  @@map("areas")
+}
+
+model Infrastructure {
+  id                 String                      @id @default(uuid())
+  type               InfrastructureType
+  name               String
+  status             InfrastructureStatus        @default(WORKING)
+  severity           SeverityLevel               @default(LOW)
+  description        String?
+  latitude           Float
+  longitude          Float
+  address            String?
+  imageUrl           String?
+  reportCount        Int                         @default(0)
+  verificationStatus VerificationStatus          @default(UNVERIFIED)
+  areaId             String?
+  area               Area?                       @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  reports            Report[]
+  statusHistory      InfrastructureStatusHistory[]
+  lastVerifiedAt     DateTime?
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  @@index([latitude, longitude])
+  @@index([type])
+  @@index([status])
+  @@index([severity])
+  @@index([verificationStatus])
+  @@index([createdAt])
+  @@map("infrastructures")
+}
+
+model Report {
+  id               String          @id @default(uuid())
+  infrastructureId String?
+  infrastructure   Infrastructure? @relation(fields: [infrastructureId], references: [id], onDelete: SetNull)
+  areaId           String?
+  area             Area?           @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  issueType        IssueType
+  description      String
+  severity         SeverityLevel   @default(MEDIUM)
+  latitude         Float
+  longitude        Float
+  imageUrl         String?
+  status           ReportStatus    @default(SUBMITTED)
+  reporterName     String?
+  reporterContact  String?
+  verifications    Verification[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([latitude, longitude])
+  @@index([issueType])
+  @@index([status])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("reports")
+}
+
+model Verification {
+  id               String           @id @default(uuid())
+  reportId         String
+  report           Report           @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  verificationType VerificationType
+  verifiedBy       String
+  notes            String?
+  createdAt        DateTime         @default(now())
+
+  @@index([reportId])
+  @@index([verificationType])
+  @@map("verifications")
+}
+
+model InfrastructureStatusHistory {
+  id               String               @id @default(uuid())
+  infrastructureId String
+  infrastructure   Infrastructure       @relation(fields: [infrastructureId], references: [id], onDelete: Cascade)
+  oldStatus        InfrastructureStatus
+  newStatus        InfrastructureStatus
+  reason           String?
+  createdAt        DateTime             @default(now())
+
+  @@index([infrastructureId])
+  @@index([createdAt])
+  @@map("infrastructure_status_histories")
+}
